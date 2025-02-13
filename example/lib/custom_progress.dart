@@ -1,42 +1,45 @@
 import 'dart:math' as math;
+import 'package:example/pull_progressor.dart';
 import 'package:flutter/material.dart';
 
-enum CustomProgressorState {
-  idle, // 초기 상태
-  drawing, // 드래그에 따라 그려지는 상태
-  complete, // 모든 원이 그려진 상태
-  loading // 로딩 애니메이션 상태
-}
-
-// 코코스퀘어 로고 형태로 디자인된 로딩 프로그레스 애니메이션.
-// 상태값에 따라 각기 다른 애니메이션 형태로 작동합니다.
-class CustomProgressor extends StatefulWidget {
-  final double progress; // 0.0 ~ 1.0
-  final bool isLoading;
-  final Color color;
-  final double size;
-  final double? velocity; // 스크롤 속도 추가
-
-  const CustomProgressor({
+class CoccoProgress extends PullProgressor {
+  const CoccoProgress({
     super.key,
-    required this.progress,
-    this.isLoading = false,
-    required this.color,
-    required this.size,
-    this.velocity, // 스크롤 속도를 받을 수 있도록 추가
-  });
+    required super.progress,
+    super.isLoading = false,
+    required super.color,
+    required double size,
+    super.velocity,
+  }) : super(width: size, height: size);
 
   @override
-  State<CustomProgressor> createState() => _CustomProgressorState();
+  State<CoccoProgress> createState() => _CoccoProgressState();
+
+  @override
+  PullProgressor copyWith({
+    double? progress,
+    bool? isLoading,
+    Color? color,
+    double? width,
+    double? height,
+    double? velocity,
+  }) {
+    final size = width ?? height ?? this.width;
+    return CoccoProgress(
+      progress: progress ?? this.progress,
+      isLoading: isLoading ?? this.isLoading,
+      color: color ?? this.color,
+      size: size,
+      velocity: velocity ?? this.velocity,
+    );
+  }
 }
 
-class _CustomProgressorState extends State<CustomProgressor>
-    with TickerProviderStateMixin {
+class _CoccoProgressState extends State<CoccoProgress>
+    with TickerProviderStateMixin, ProgressStateMixin<CoccoProgress> {
   late final List<AnimationController> _rotationControllers;
   late final List<Animation<double>> _rotationAnimations;
   final List<double> _baseRotationSpeeds = [1.2, 1.4, 1.0, 1.6, 1.1];
-
-  CustomProgressorState _currentState = CustomProgressorState.idle;
 
   @override
   void initState() {
@@ -60,23 +63,27 @@ class _CustomProgressorState extends State<CustomProgressor>
       );
     }).toList();
 
-    _updateState();
+    updateProgressState();
   }
 
-  void _updateState() {
-    if (widget.isLoading) {
-      _currentState = CustomProgressorState.loading;
-      _startRotation();
-    } else if (widget.progress >= 1.0) {
-      _currentState = CustomProgressorState.complete;
-      _stopRotation();
-    } else if (widget.progress > 0) {
-      _currentState = CustomProgressorState.drawing;
-      _stopRotation();
-    } else {
-      _currentState = CustomProgressorState.idle;
-      _stopRotation();
-    }
+  @override
+  void onLoadingStateEntered() {
+    _startRotation();
+  }
+
+  @override
+  void onCompleteStateEntered() {
+    _stopRotation();
+  }
+
+  @override
+  void onDrawingStateEntered() {
+    _stopRotation();
+  }
+
+  @override
+  void onIdleStateEntered() {
+    _stopRotation();
   }
 
   void _startRotation() {
@@ -113,24 +120,14 @@ class _CustomProgressorState extends State<CustomProgressor>
   @override
   Widget build(BuildContext context) {
     return CustomPaint(
-      size: Size(widget.size, widget.size),
-      painter: CustomProgressorPainter(
+      size: Size(widget.width, widget.height),
+      painter: CoccoProgressPainter(
         progress: widget.progress,
         color: widget.color,
         rotationAnimations: _rotationAnimations,
-        state: _currentState,
+        state: currentState,
       ),
     );
-  }
-
-  @override
-  void didUpdateWidget(CustomProgressor oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.progress != oldWidget.progress ||
-        widget.isLoading != oldWidget.isLoading ||
-        widget.velocity != oldWidget.velocity) {
-      _updateState();
-    }
   }
 
   @override
@@ -142,13 +139,13 @@ class _CustomProgressorState extends State<CustomProgressor>
   }
 }
 
-class CustomProgressorPainter extends CustomPainter {
+class CoccoProgressPainter extends CustomPainter {
   final double progress;
   final Color color;
   final List<Animation<double>> rotationAnimations;
-  final CustomProgressorState state;
+  final ProgressState state;
 
-  CustomProgressorPainter({
+  CoccoProgressPainter({
     required this.progress,
     required this.color,
     required this.rotationAnimations,
@@ -181,7 +178,7 @@ class CustomProgressorPainter extends CustomPainter {
 
     final startAngle = -3 * math.pi / 12;
 
-    if (state == CustomProgressorState.loading) {
+    if (state == ProgressState.loading) {
       for (var i = 0; i < 4; i++) {
         canvas.save();
         canvas.translate(bgCircleCenters[i].dx, bgCircleCenters[i].dy);
@@ -264,7 +261,7 @@ class CustomProgressorPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant CustomProgressorPainter oldDelegate) {
+  bool shouldRepaint(covariant CoccoProgressPainter oldDelegate) {
     return progress != oldDelegate.progress ||
         color != oldDelegate.color ||
         rotationAnimations != oldDelegate.rotationAnimations ||

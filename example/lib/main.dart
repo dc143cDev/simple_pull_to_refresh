@@ -1,3 +1,4 @@
+import 'package:example/custom_progress.dart';
 import 'package:flutter/material.dart';
 import 'package:example/pull_to_refresh_field.dart';
 
@@ -61,9 +62,15 @@ class _MyHomePageState extends State<MyHomePage> {
       ),
       body: PullToRefreshField(
         scrollController: _scrollController,
-        onRefresh: _handleRefresh,
+        pullProgressor: CoccoProgress(
+          progress: 0.5,
+          color: Colors.blue,
+          size: 36,
+        ),
+        onPullDone: _handleRefresh,
         progressColor: Colors.blue,
-        progressSize: 36,
+        progressWidth: 36,
+        progressHeight: 36,
         child: _items.isEmpty
             ? const Center(
                 child: Column(
