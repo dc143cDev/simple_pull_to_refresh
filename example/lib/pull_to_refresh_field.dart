@@ -13,26 +13,33 @@ class PullToRefreshField extends StatefulWidget {
   final Widget child;
   final PullProgressor pullProgressor;
   final Future<void> Function() onPullDone;
+  final Future<void> Function()? onPastPullDone;
   final Color? progressColor;
   final double progressWidth;
   final double progressHeight;
   final ProgressPosition progressPosition;
   final bool enableSplash;
   final Color? splashColor;
+  final double pullThreshold;
 
   const PullToRefreshField({
     required this.scrollController,
     required this.child,
     required this.pullProgressor,
     required this.onPullDone,
+    this.onPastPullDone,
     this.progressColor = Colors.black,
     this.progressWidth = 36,
     this.progressHeight = 36,
     this.progressPosition = ProgressPosition.topPullToDown,
     this.enableSplash = false,
     this.splashColor,
+    this.pullThreshold = 0.25,
     super.key,
-  });
+  }) : assert(
+          pullThreshold > 0.0 && pullThreshold <= 1.0,
+          'pullThreshold must be between 0.0 and 1.0',
+        );
 
   @override
   State<PullToRefreshField> createState() => _PullToRefreshFieldState();
@@ -43,6 +50,7 @@ class _PullToRefreshFieldState extends State<PullToRefreshField> {
   static const double _scrollThreshold = 1.0;
   static const double _refreshHeight = 100.0;
   static const double _maintainedHeight = 50.0;
+  static const double _velocityThreshold = 800.0;
 
   double _dragOffset = 0.0;
   double _dragProgress = 0.0;
@@ -197,8 +205,7 @@ class _PullToRefreshFieldState extends State<PullToRefreshField> {
   }
 
   void _onPointerUp(double progress) async {
-    if (!_isRefreshing && progress >= 1.0) {
-      HapticFeedback.mediumImpact();
+    if (!_isRefreshing && progress >= widget.pullThreshold) {
       setState(() {
         _isRefreshing = true;
         _showLoadingAnimation = true;
@@ -216,7 +223,13 @@ class _PullToRefreshFieldState extends State<PullToRefreshField> {
             _showLoadingAnimation = true;
             _isIndeterminateLoading = true;
           });
-          _handleRefresh();
+
+          if (widget.onPastPullDone != null &&
+              _scrollVelocity.abs() > _velocityThreshold) {
+            _handlePastPullDone();
+          } else {
+            _handleRefresh();
+          }
           return;
         }
         setState(() {
@@ -226,6 +239,16 @@ class _PullToRefreshFieldState extends State<PullToRefreshField> {
         });
       });
     } else if (!_isRefreshing) {
+      _resetDragProgressWithAnimation();
+    }
+  }
+
+  Future<void> _handlePastPullDone() async {
+    try {
+      _showLoadingAnimation = true;
+      await widget.onPastPullDone!();
+    } finally {
+      _isRefreshing = false;
       _resetDragProgressWithAnimation();
     }
   }
